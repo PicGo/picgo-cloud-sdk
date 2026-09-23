@@ -30,7 +30,7 @@ The person using your application supplies their own token, which grants access 
 ```ts
 const client = new PicGoCloudClient({
   token: async () => getCurrentUserToken(),
-  baseUrl: 'https://api.picgo.app', // Default; use your Worker URL for local development
+  baseUrl: 'https://api.picgo.app', // Default PicGo Cloud API URL
   timeoutMs: 30_000, // Timeout per API request
   uploadTimeoutMs: 120_000, // Timeout per file or part PUT
   // storage: false, // Disable persistent upload recovery
@@ -52,9 +52,9 @@ const media = await client.upload(file, {
 await client.upload(blob, { filename: 'photo.png', contentType: 'image/png' })
 ```
 
-Files smaller than 10 MiB use a single presigned PUT; files at or above 10 MiB automatically use multipart uploads. Part sizes come from the server. The default concurrency is 3 and can be set to 1–6 using `concurrency`. The SDK accepts files from 1 byte to 1 GiB; the server still enforces supported formats, size limits by media type, plans, and quotas. Files are not converted, compressed, or re-encoded. Use `width` and `height` to supply image dimensions.
+The SDK chooses the upload method automatically. Files at or above 10 MiB support multipart uploads, with a default concurrency of 3; set `concurrency` to a value from 1–6 to adjust it. Accepted files are between 1 byte and 1 GiB, subject to your PicGo Cloud plan, remaining quota, and supported file formats. Files are not converted, compressed, or re-encoded. Use `width` and `height` to supply image dimensions.
 
-The `phase` is `preparing`, `uploading`, `completing`, or `completed`. The `fraction` measures byte transfer only: reaching 100% may still leave multipart completion and media registration to finish. The upload is complete only when its Promise resolves. Transfer progress can decrease during retries. Exceptions thrown by progress callbacks do not affect the upload result.
+The `phase` is `preparing`, `uploading`, `completing`, or `completed`. The `fraction` measures transfer progress: reaching 100% does not mean the file is ready to use yet. Wait for the Promise to resolve before using the returned media item. Transfer progress can decrease during retries. Exceptions thrown by progress callbacks do not affect the upload result.
 
 ### Pausing, resuming, and cancelling
 
@@ -86,27 +86,25 @@ startButton.addEventListener('click', startOrResume)
 resumeButton.addEventListener('click', startOrResume)
 ```
 
-`createUpload()` does not send requests immediately. Call `start()` to begin; repeated calls while it is running return the same Promise. `pause()` interrupts the current requests and rejects that Promise with `kind: 'paused'`; once it settles, call `start()` again to continue. `cancel()` interrupts the upload and cleans up an unfinished multipart session. Create a new task after cancellation. Cleanup failures are reported to the caller, and recovery records remain available for another attempt. Cancellation does not roll back registered media; uploaded objects that were never registered are handled by the server's cleanup policy.
+`createUpload()` does not send requests immediately. Call `start()` to begin; repeated calls while it is running return the same Promise. `pause()` interrupts the upload and rejects that Promise with `kind: 'paused'`; once it settles, call `start()` again to continue. `cancel()` stops the upload and releases its pending resources. If it fails, you can call it again. Create a new task after cancellation. Cancelling does not delete an already completed media item; use `client.media.delete()` for that.
 
-The `task.status` is `idle`, `running`, `paused`, `cancelled`, `failed`, or `completed`. If your application already uses an AbortController, you can pass its `signal`. Aborting an external signal retains recovery information and does not perform the server cleanup that `cancel()` does. An already-aborted external signal cannot be reused to restart an upload; create a new task.
+The `task.status` is `idle`, `running`, `paused`, `cancelled`, `failed`, or `completed`. If your application already uses an AbortController, you can pass its `signal`. Aborting an external signal retains recovery information; use `cancel()` to abandon the upload. An already-aborted external signal cannot be reused to restart an upload; create a new task.
 
 ### Resumable uploads
 
-By default, multipart uploads store their session and completed part ETags in the current site's localStorage, with a 24-hour cache lifetime. After refreshing the page, select the original file and call `upload()` or `createUpload().start()` to resume automatically. The SDK identifies files using chunked content hashes, reading the file during preparation without loading it all into memory. Records are isolated by API URL, account, and file. They contain no tokens, presigned URLs, or file contents.
+Multipart uploads save recovery information in the current site's localStorage for up to 24 hours. After refreshing the page, select the same file and call `upload()` or `createUpload().start()` to resume automatically. Recovery records are isolated by account and file and contain no tokens or file contents. Keep the same account and API URL when resuming.
 
-Newer Workers expose `whoami.userId` for account isolation, allowing the same account to resume after changing tokens. Older Workers without this field use a token hash for isolation, so changing the token will not match previous records. A task cannot switch accounts. When available, Web Locks prevent multiple tabs from resuming the same file simultaneously; otherwise, exclusion applies only within the current page.
+Recovery is limited to the same site and browser, while the saved upload remains valid. It does not work across sites or devices. If browser storage is unavailable, you can still pause and resume the current task while the page remains open. Set `storage: false` on the client to disable persistence, or `resume: false` in upload options to ignore persisted records. If a file smaller than 10 MiB is paused during transfer, resuming restarts that transfer. Avoid uploading the same file from multiple tabs at once.
 
-Recovery requires the current site's local record, the same file, and an unexpired server session. It does not work across sites or devices. If browser storage is unavailable, recovery falls back to the task's in-memory state. Set `storage: false` to disable persistence, or `resume: false` to ignore persisted records for an upload. Small files cannot resume across page refreshes, but retrying registration on the same task does not repeat the PUT. Multipart uploads retain their merged-but-unregistered state until registration succeeds.
-
-The SDK retries only steps that can safely be retried. Part PUTs receive up to 3 additional attempts with 1/2/4-second backoff; a 403 triggers a new signed URL. Media updates, deletions, and upload session creation are not silently retried. If the multipart completion response is lost, the SDK first attempts idempotent media registration to determine whether the object was already assembled, rather than immediately creating another upload.
+Temporary upload failures are retried automatically when safe. If a task fails, catch the error and call `start()` again to retry. Media updates and deletions are not automatically retried.
 
 ## Media management
 
-PicGo Cloud's current album is a list of media items, with no separate album grouping entity. The `media` API maps to `/api/album-items`, does not use the deprecated `/api/media`, and does not import records from third-party image hosts.
+Use `client.media` to browse and manage the media in the user's PicGo Cloud account.
 
 | Method | Returns |
 | --- | --- |
-| `client.whoami(options?)` | Current user details, including `userId` on newer servers |
+| `client.whoami(options?)` | Current user details; also verifies the supplied token |
 | `client.media.list(query?, options?)` | `{ items, total, limit, offset }` |
 | `client.media.get(id, options?)` | `MediaItem` |
 | `client.media.update(id, changes, options?)` | `MediaItem` |
@@ -126,7 +124,7 @@ await client.media.updateMany([
 await client.media.deleteMany([firstId, secondId])
 ```
 
-Media fields retain their server names: `id`, `imgUrl`, `fileName`, `type`, `contentType`, `size`, `width`, `height`, `extname`, `createdAt`, `updatedAt`, `originImgUrl`, `url`, and `extra`. Timestamps are in milliseconds. Updates change media metadata, not the stored file contents; `size` and `extname` cannot be updated. Deletion is a server-side soft delete, and there is currently no restore API.
+`MediaItem` includes `id`, `imgUrl`, and optional metadata such as `fileName`, `type`, `contentType`, `size`, `width`, `height`, `extname`, `createdAt`, `updatedAt`, `originImgUrl`, `url`, and `extra`. Timestamps are in milliseconds. Updates change metadata, not the file contents; `size` and `extname` cannot be updated. Deleted items disappear from the media list. The SDK does not provide a restore operation.
 
 ## Error handling
 
@@ -145,46 +143,24 @@ try {
 }
 ```
 
-`PicGoCloudError` includes the error `kind`, optional HTTP `status`, server `code`, and original `cause`. Some server errors have no code; use the status as a fallback. The SDK does not branch on error messages or automatically clear the user's token. Browsers may report CORS rejections as ordinary network errors, so check both the API and R2 CORS configurations when troubleshooting.
+`PicGoCloudError` includes the error `kind`, optional HTTP `status`, service `code`, and original `cause`. Use `kind`, `status`, and `code` for application logic rather than matching error messages. A 401 usually means the user needs to provide a valid token. For network errors, check connectivity and the configured API URL. The SDK does not automatically clear the user's token.
 
-## Server requirements
+## Try the example locally
 
-The SDK does not bypass browser CORS. The companion picgo-hub branch, `feat-cloud-sdk`, enables third-party Bearer CORS for the SDK's endpoints while preserving Portal cookies and the OAuth callback allowlist. The R2 bucket must allow PUT requests from third-party origins and the headers required by signing, and expose `ETag` through `ExposeHeaders`. See the hub SDK CORS documentation for configuration and deployment verification. Source changes alone do not update production configuration.
-
-Business requests always go to the configured API. Production R2 transfers do not include the account token. For local development, Bearer authentication is added only to recognized Worker upload proxy paths on the same localhost/127.0.0.1 origin as the API.
-
-## Development
-
-Use Node.js 22.18+ (Node.js 24 recommended) for development. Environment files are loaded by Node.js itself; no dotenv package is needed.
-
-```sh
-pnpm install
-pnpm check
-```
-
-`pnpm check` runs type checking, ESLint, Vitest, local development server tests, and the build. Output includes `dist/index.js`, a source map, and type declarations. The package is ESM-only and contains no Node polyfills.
-
-### Test against a real backend
-
-Copy `.env.example` to `.env` and set the API URL for the environment you want to test:
+Clone this repository and use Node.js 22.18+ (Node.js 24 recommended). Copy `.env.example` to `.env`:
 
 ```dotenv
-PICGO_API_URL=https://pr-89-dev-api.picgo.app
+PICGO_API_URL=https://api.picgo.app
 PICGO_DEV_PORT=5175
 ```
 
 ```sh
+pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:5175`. The playground loads the configured API URL and provides token verification, uploads, pause/resume/cancel, media listing, details, renaming, and deletion. Enter your own token for that backend in the page; it stays in memory. Uploaded items automatically populate the media ID field for follow-up operations. Operations on this page use the real backend and affect that account's media.
+Open `http://localhost:5175` and enter your PicGo Cloud token. The example lets you verify the token, upload files, pause/resume/cancel uploads, and list, inspect, rename, or delete media. Uploaded items automatically populate the media ID field for follow-up operations. These actions affect the account associated with your token.
 
 Start by verifying the token, then upload a file smaller than 10 MiB and one at or above 10 MiB. Test pausing and resuming a multipart upload, and refresh the page and reselect the same file to test recovery. Use the media buttons to verify that the uploaded item's metadata can be read, renamed, and deleted. If a fast connection makes interruption difficult, throttle the network in browser developer tools.
 
-To switch to the shared development environment, set `PICGO_API_URL=https://dev-api.picgo.app` and restart `pnpm dev`. Existing shell environment variables take precedence over `.env`. The dev command rebuilds the SDK when source files change; refresh the page to load the new build. Changes to `.env` require a server restart. `.env` is ignored by Git; only `PICGO_API_URL` is exposed to the browser, not other environment variables.
-
-Requests go directly from the browser to the selected backend and R2, without a local API proxy. Port 5175 deliberately exercises third-party CORS instead of the Portal's existing local-origin allowlist. The Worker CORS change must be deployed to the selected backend, and its R2 bucket must allow PUT and expose `ETag`. The `.env` setting configures only this development playground; applications consuming the published SDK still pass `baseUrl` explicitly.
-
-### Test with local protocol fixtures
-
-To verify the protocol in a real browser, run `pnpm build && pnpm test:browser:serve` and open `http://localhost:41780`. This local test uses three different origins to simulate the page, API, and storage. It checks real CORS preflights, XHR progress, ETag access, media management, and recovery from registration failure after multipart completion. It does not access real accounts or write to cloud storage. The page displays `passed: true` on success. Stop the server with Ctrl+C, and restart it before each new test to reset the simulated state.
+You can change `PICGO_API_URL` to test another PicGo Cloud API endpoint; restart `pnpm dev` after editing `.env`. Existing shell environment variables take precedence. Source changes rebuild automatically; refresh the page to load them. `.env` is ignored by Git, and the token stays in page memory. These environment settings apply only to the example. In your own application, pass `baseUrl` to `PicGoCloudClient` when overriding the default URL.

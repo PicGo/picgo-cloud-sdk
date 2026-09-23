@@ -4,10 +4,10 @@ import test from 'node:test'
 import { createDevServer, readDevConfig } from './dev-server.mjs'
 
 test('development config uses only the API URL and local port', () => {
-  assert.deepEqual(readDevConfig({ PICGO_API_URL: 'https://pr-89-dev-api.picgo.app/', PICGO_DEV_PORT: '5176', SECRET: 'private' }), {
-    apiUrl: 'https://pr-89-dev-api.picgo.app', port: 5176,
+  assert.deepEqual(readDevConfig({ PICGO_API_URL: 'https://preview.example.com/', PICGO_DEV_PORT: '5176', SECRET: 'private' }), {
+    apiUrl: 'https://preview.example.com', port: 5176,
   })
-  assert.equal(readDevConfig({}).apiUrl, 'https://dev-api.picgo.app')
+  assert.equal(readDevConfig({}).apiUrl, 'https://api.picgo.app')
   for (const value of ['file:///tmp/file', 'https://user:secret@example.com', 'https://example.com?token=secret']) {
     assert.throws(() => readDevConfig({ PICGO_API_URL: value }))
   }

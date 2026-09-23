@@ -2,7 +2,7 @@ import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 
 export function readDevConfig(env = process.env) {
-  const api = new URL(env.PICGO_API_URL || 'https://dev-api.picgo.app')
+  const api = new URL(env.PICGO_API_URL || 'https://api.picgo.app')
   if (!['https:', 'http:'].includes(api.protocol) || api.username || api.password || api.search || api.hash) {
     throw new Error('PICGO_API_URL must be an HTTP(S) URL without credentials, query, or hash')
   }

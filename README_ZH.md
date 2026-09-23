@@ -1,5 +1,7 @@
 # @picgo/cloud-sdk
 
+[English](README.md)
+
 面向现代浏览器的 PicGo Cloud JavaScript SDK，使用 TypeScript 编写、Rolldown 构建，零运行时依赖。提供文件上传、分片续传和媒体管理，不包含 UI 组件。Node.js 场景请使用 PicGo-Core。
 
 ## 安装与使用
@@ -28,7 +30,7 @@ token 由使用网页的用户提供，代表该用户的账户权限。SDK 使�
 ```ts
 const client = new PicGoCloudClient({
   token: async () => getCurrentUserToken(),
-  baseUrl: 'https://api.picgo.app', // 默认值；本地开发可指向 Worker
+  baseUrl: 'https://api.picgo.app', // 默认 PicGo Cloud API 地址
   timeoutMs: 30_000, // 单次 API 请求超时
   uploadTimeoutMs: 120_000, // 单次文件/分片 PUT 超时
   // storage: false, // 可关闭续传记录持久化
@@ -50,9 +52,9 @@ const media = await client.upload(file, {
 await client.upload(blob, { filename: 'photo.png', contentType: 'image/png' })
 ```
 
-小于 10 MiB 使用单次预签名 PUT，大于等于 10 MiB 自动分片。分片大小使用服务端返回值，默认并发 3，可通过 `concurrency` 设置为 1–6。SDK 接受 1 byte–1 GiB，实际文件格式、类型大小限制、套餐和配额仍由服务端校验。不转换、压缩或重新编码文件。可通过 `width`、`height` 提供图片尺寸。
+SDK 会自动选择上传方式，大于等于 10 MiB 的文件支持分片上传。默认并发 3，可通过 `concurrency` 设置为 1–6。支持的文件大小为 1 byte–1 GiB，实际可上传的格式和大小还取决于你的 PicGo Cloud 套餐及剩余配额。文件不会被转换、压缩或重新编码。可通过 `width`、`height` 提供图片尺寸。
 
-`phase` 为 `preparing`、`uploading`、`completing`、`completed`。`fraction` 仅表示文件传输比例，传输达到 100% 后还有合并和媒体入库步骤；只有 Promise 成功返回才代表上传完成。重试时传输进度可能回退。进度回调抛出的异常不会改变上传结果。
+`phase` 为 `preparing`、`uploading`、`completing`、`completed`。`fraction` 表示传输进度，达到 100% 不代表文件已经可以使用；请等待 Promise 成功返回后再使用媒体条目。重试时进度可能回退。进度回调抛出的异常不会改变上传结果。
 
 ### 暂停、继续与取消
 
@@ -84,27 +86,25 @@ startButton.addEventListener('click', startOrResume)
 resumeButton.addEventListener('click', startOrResume)
 ```
 
-`createUpload()` 不立即发送请求。`start()` 开始上传；正在运行时重复调用会返回同一个 Promise。`pause()` 中断当前请求，当前 Promise 以 `kind: 'paused'` 拒绝；等待它结束后再次 `start()` 继续。`cancel()` 中断并清理未完成的分片会话，任务取消后需新建任务。清理请求失败会向调用方报告，保留记录以便再次尝试。取消不回滚已成功入库的媒体；已经传完但未入库的对象由服务端清理策略处理。
+`createUpload()` 不立即发送请求。调用 `start()` 开始上传，正在运行时重复调用会返回同一个 Promise。`pause()` 中断上传，当前 Promise 以 `kind: 'paused'` 拒绝；等待它结束后再次调用 `start()` 继续。`cancel()` 停止上传并释放未完成任务的资源，失败时可以再次调用。取消后需新建任务。取消不会删除已经上传成功的媒体，删除请使用 `client.media.delete()`。
 
-`task.status` 可读取 `idle`、`running`、`paused`、`cancelled`、`failed`、`completed`。如应用已有 AbortController，可选传入 `signal`；外部 signal 中断会保留续传信息，不等同于 `cancel()` 的服务端清理。已经中断的外部 signal 不能用于重新开始，应创建新任务。
+`task.status` 可读取 `idle`、`running`、`paused`、`cancelled`、`failed`、`completed`。如应用已有 AbortController，可选传入 `signal`。外部 signal 中断会保留续传信息；要放弃上传，请使用 `cancel()`。已经中断的外部 signal 不能用于重新开始，应创建新任务。
 
 ### 断点续传
 
-分片上传默认将会话及已完成分片的 ETag 写入当前站点的 localStorage，缓存有效期 24 小时。刷新页面后重新选择原文件，再调用 `upload()` 或 `createUpload().start()`，会自动恢复。SDK 以分块内容摘要识别文件，内存占用不随整个文件大小增长；准备阶段会读取文件内容。记录按 API 地址、账户和文件隔离，不包含 token、预签名 URL 或原始文件。
+分片上传会在当前站点的 localStorage 中保存最多 24 小时的恢复信息。刷新页面后重新选择同一文件，再调用 `upload()` 或 `createUpload().start()`，即可自动恢复。恢复记录按账户和文件隔离，不包含 token 或文件内容。续传时请保持同一账户和 API 地址。
 
-新 Worker 的 `whoami.userId` 用于账户隔离，同一账户更换 token 后仍可恢复；旧 Worker 没有该字段时使用 token 摘要隔离，更换 token 后不会命中旧记录。同一任务不允许切换账户。Web Locks 可用时阻止跨标签页同时恢复同一文件；不支持 Web Locks 时只提供当前页面内的互斥。
+恢复仅适用于同一站点、同一浏览器中仍有效的上传记录，不支持跨站点或跨设备恢复。浏览器存储不可用时，页面保持打开期间仍可暂停和继续当前任务。在客户端设置 `storage: false` 可关闭持久化，在上传选项中设置 `resume: false` 可忽略已有记录。小于 10 MiB 的文件若在传输过程中暂停，继续时会重新传输。请避免在多个标签页同时上传同一文件。
 
-续传需要当前站点仍保留本地记录、用户提供同一文件，且服务端会话尚未失效；不支持跨站点或跨设备恢复。浏览器存储不可用时自动降级为任务内存中的续传。`storage: false` 关闭持久化，`resume: false` 让该次上传忽略持久化记录。小文件不提供跨刷新续传，但同一任务入库失败后重试不会重复 PUT。分片上传会保留已合并待入库状态，直到入库成功才清除记录。
-
-SDK 只重试可安全重试的步骤，分片 PUT 使用最多 3 次额外重试和 1/2/4 秒退避，403 时重新获取签名 URL。媒体更新、删除及新建上传会话不会被静默重试。丢失分片合并响应时，优先尝试幂等的媒体入库以确认是否已经合并，避免直接创建另一份上传。
+临时上传失败会在安全的情况下自动重试。任务失败后，可以捕获错误并再次调用 `start()` 重试。媒体更新和删除不会自动重试。
 
 ## 媒体管理
 
-PicGo Cloud 当前的“相册”是媒体条目列表，没有相册分组实体。`media` 对应 `/api/album-items`，不使用已弃用的 `/api/media`，不提供第三方图床记录导入。
+使用 `client.media` 浏览和管理用户 PicGo Cloud 账户中的媒体。
 
 | 方法 | 返回值 |
 | --- | --- |
-| `client.whoami(options?)` | 当前用户资料，含新版服务端的 `userId` |
+| `client.whoami(options?)` | 当前用户资料，也可用于验证 token |
 | `client.media.list(query?, options?)` | `{ items, total, limit, offset }` |
 | `client.media.get(id, options?)` | `MediaItem` |
 | `client.media.update(id, changes, options?)` | `MediaItem` |
@@ -124,7 +124,7 @@ await client.media.updateMany([
 await client.media.deleteMany([firstId, secondId])
 ```
 
-媒体字段沿用服务端命名，包括 `id`、`imgUrl`、`fileName`、`type`、`contentType`、`size`、`width`、`height`、`extname`、`createdAt`、`updatedAt`、`originImgUrl`、`url`、`extra`，时间戳为毫秒。更新修改媒体元数据，不修改存储中的文件内容；不允许更新 `size`、`extname`。删除是服务端软删除，目前没有恢复接口。
+`MediaItem` 包含 `id`、`imgUrl`，以及可选的 `fileName`、`type`、`contentType`、`size`、`width`、`height`、`extname`、`createdAt`、`updatedAt`、`originImgUrl`、`url`、`extra` 等元数据。时间戳为毫秒。更新修改元数据，不修改文件内容；不允许更新 `size`、`extname`。删除后条目将不再出现在媒体列表中，SDK 不提供恢复操作。
 
 ## 错误处理
 
@@ -143,46 +143,24 @@ try {
 }
 ```
 
-`PicGoCloudError` 包含错误类别 `kind`、可选 HTTP `status`、后端 `code` 和原始 `cause`。服务端部分错误没有 code，可按状态码兜底。SDK 不根据错误文案决定行为，不自动清除用户 token。浏览器可能把 CORS 拒绝表现为普通网络错误；诊断时检查 API 和 R2 两处跨域配置。
+`PicGoCloudError` 包含错误类别 `kind`、可选 HTTP `status`、服务错误码 `code` 和原始 `cause`。请根据 `kind`、`status`、`code` 处理错误，不要匹配错误文案。401 通常表示需要用户提供有效的 token。遇到网络错误时，检查网络连接和配置的 API 地址。SDK 不会自动清除用户 token。
 
-## 服务端接入条件
+## 本地试用示例
 
-SDK 不会绕过浏览器跨域。配套 picgo-hub 分支 `feat-cloud-sdk` 为 SDK 使用的端点增加第三方 Bearer CORS，同时保留 Portal Cookie 和 OAuth 回调白名单。R2 Bucket 必须允许第三方 Origin 的 PUT、签名所需请求头，并通过 `ExposeHeaders` 暴露 `ETag`。具体配置及部署验证步骤见 hub 的 SDK CORS 文档。修改源码不代表线上配置已生效。
-
-业务请求始终发送给配置的 API。生产 R2 直传不携带账户 token；仅 localhost/127.0.0.1 的同源、已知 Worker 上传代理路径会添加 Bearer 以支持本地开发。
-
-## 开发
-
-开发需要 Node.js 22.18+，推荐 Node.js 24。环境文件由 Node.js 原生加载，无需安装 dotenv。
-
-```sh
-pnpm install
-pnpm check
-```
-
-`pnpm check` 运行类型检查、ESLint、Vitest、本地开发服务器测试和构建。产物为 `dist/index.js`、sourcemap 及类型声明，仅发布 ESM，无 Node polyfill。
-
-### 连接真实后端测试
-
-将 `.env.example` 复制为 `.env`，设置要测试的 API 地址：
+克隆本仓库，使用 Node.js 22.18+，推荐 Node.js 24。将 `.env.example` 复制为 `.env`：
 
 ```dotenv
-PICGO_API_URL=https://pr-89-dev-api.picgo.app
+PICGO_API_URL=https://api.picgo.app
 PICGO_DEV_PORT=5175
 ```
 
 ```sh
+pnpm install
 pnpm dev
 ```
 
-打开 `http://localhost:5175`。测试页会读取配置的 API 地址，提供验证 token、上传、暂停/继续/取消、媒体列表、详情、重命名和删除。请在页面中输入该环境下你自己的 token，token 仅保留在内存中。上传成功后会自动填写媒体 ID，方便继续操作。这个页面连接真实后端，操作会作用于该账户的媒体数据。
+打开 `http://localhost:5175`，输入你的 PicGo Cloud token。示例页支持验证 token、上传、暂停/继续/取消、媒体列表、详情、重命名和删除。上传成功后会自动填写媒体 ID，方便继续操作。这些操作会作用于 token 所属账户的媒体数据。
 
 建议先验证 token，再分别上传小于 10 MiB 和大于等于 10 MiB 的文件。对分片上传测试暂停与继续，再刷新页面、重新选择同一文件测试恢复。通过媒体操作按钮验证上传后的条目能查询、重命名和删除。网速太快不方便中断时，可在浏览器开发者工具中启用网络限速。
 
-切换到公共开发环境时，将 `PICGO_API_URL` 改为 `https://dev-api.picgo.app` 后重启 `pnpm dev`。已有的 shell 环境变量优先于 `.env`。修改 SDK 源码会自动重新构建，刷新页面即可加载；修改 `.env` 需要重启。`.env` 已被 Git 忽略，只有 `PICGO_API_URL` 会提供给浏览器，其他环境变量不会暴露。
-
-请求由浏览器直接发送至选定后端和 R2，不经过本地 API 代理。默认端口 5175 用于验证第三方跨域，不复用 Portal 已允许的本地域名。目标后端需要部署 Worker CORS 改动，对应 R2 Bucket 需要允许 PUT 并暴露 `ETag`。`.env` 仅配置本地测试页，接入已发布 SDK 的应用仍需显式传入 `baseUrl`。
-
-### 使用本地模拟服务测试
-
-真实浏览器协议验证可运行 `pnpm build && pnpm test:browser:serve`，然后访问 `http://localhost:41780`。这个本地测试使用三个不同 Origin 模拟网页、API 和存储，检查真实 CORS 预检、XHR 进度、ETag、媒体管理以及合并后入库失败的恢复，不会访问真实账户或写入云端。页面显示 `passed: true` 代表通过，终端 Ctrl+C 停止服务。每次重新测试前重启测试服务，以重置模拟状态。
+可以修改 `PICGO_API_URL` 来测试其他 PicGo Cloud API 地址，修改 `.env` 后需重启 `pnpm dev`。已有的 shell 环境变量优先于 `.env`。修改源码后会自动重新构建，刷新页面即可加载。`.env` 已被 Git 忽略，token 仅保留在页面内存中。这些环境设置只作用于示例页；在自己的应用中覆盖默认 API 地址时，请向 `PicGoCloudClient` 传入 `baseUrl`。
