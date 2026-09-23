@@ -1,0 +1,33 @@
+{
+  "name": "@picgo/cloud-sdk",
+  "version": "0.1.0",
+  "description": "PicGo Cloud uploads and media management for modern browsers",
+  "type": "module",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/PicGo/picgo-cloud-sdk.git" },
+  "sideEffects": false,
+  "files": ["dist", "README.md", "LICENSE"],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "scripts": {
+    "build": "rolldown -c && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:browser:serve": "node scripts/browser-smoke.mjs",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "prepublishOnly": "pnpm check"
+  },
+  "packageManager": "pnpm@11.7.0",
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
+    "rolldown": "^1.2.9",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.49.0",
+    "vitest": "~4.1.10"
+  }
+}

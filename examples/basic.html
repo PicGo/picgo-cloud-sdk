@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PicGo Cloud SDK 示例</title>
+<style>body{font:16px system-ui;max-width:720px;margin:48px auto;padding:0 20px}label{display:block;margin:18px 0}input{padding:8px}button{padding:8px 16px;margin-right:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere}progress{width:100%;margin:20px 0}</style>
+<h1>PicGo Cloud SDK</h1>
+<p>提供你自己的 token，选择文件上传。暂停后可继续，刷新后重新选择同一文件可续传。</p>
+<label>API <input id="api" type="url" value="https://api.picgo.app" size="36"></label>
+<label>Token <input id="token" type="password" autocomplete="off" size="36"></label>
+<label>文件 <input id="file" type="file"></label>
+<button id="start">上传 / 继续</button><button id="pause">暂停</button><button id="cancel">取消</button><button id="list">媒体列表</button>
+<progress id="progress" max="1" value="0"></progress>
+<pre id="output" aria-live="polite"></pre>
+<script type="module">
+  import { PicGoCloudClient } from '../dist/index.js'
+  const element = id => document.getElementById(id)
+  const show = value => { element('output').textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2) }
+  let task
+  let sourceFile
+  let baseUrl
+  const client = () => new PicGoCloudClient({ token: () => element('token').value, baseUrl: element('api').value })
+  element('start').addEventListener('click', async () => {
+    try {
+      const file = element('file').files[0]
+      if (!file) { show('请选择文件'); return }
+      if (!task || sourceFile !== file || baseUrl !== element('api').value || task.status === 'cancelled') {
+        sourceFile = file
+        baseUrl = element('api').value
+        task = client().createUpload(file, { onProgress(progress) {
+          element('progress').value = progress.fraction
+          show(progress)
+        } })
+      }
+      show(await task.start())
+    } catch (error) { show(`${error.kind ?? 'error'}: ${error.message}`) }
+  })
+  element('pause').addEventListener('click', () => task?.pause())
+  element('cancel').addEventListener('click', async () => {
+    try { await task?.cancel(); show('已取消') } catch (error) { show(error.message) }
+  })
+  element('list').addEventListener('click', async () => {
+    try { show(await client().media.list({ limit: 20 })) } catch (error) { show(error.message) }
+  })
+</script>
+</html>
