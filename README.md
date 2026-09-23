@@ -1,8 +1,10 @@
 # @picgo/cloud-sdk
 
-面向现代浏览器的 PicGo Cloud JavaScript SDK，使用 TypeScript 编写、Rolldown 构建，零运行时依赖。提供文件上传、分片续传和媒体管理，不包含 UI 组件。Node.js 场景请使用 PicGo-Core。
+[中文文档](README_ZH.md)
 
-## 安装与使用
+A PicGo Cloud JavaScript SDK for modern browsers, written in TypeScript and built with Rolldown, with zero runtime dependencies. It provides file uploads, resumable multipart uploads, and media management without UI components. For Node.js, use PicGo-Core.
+
+## Installation and usage
 
 ```sh
 pnpm add @picgo/cloud-sdk
@@ -18,26 +20,26 @@ const client = new PicGoCloudClient({
 const media = await client.upload(file)
 console.log(media.id, media.imgUrl)
 
-const page = await client.media.list({ limit: 20, offset: 0, search: '旅行' })
-await client.media.update(media.id, { fileName: '旅行照片.jpg' })
+const page = await client.media.list({ limit: 20, offset: 0, search: 'travel' })
+await client.media.update(media.id, { fileName: 'travel-photo.jpg' })
 await client.media.delete(media.id)
 ```
 
-token 由使用网页的用户提供，代表该用户的账户权限。SDK 使用 `Authorization: Bearer`，不携带 Cookie，也不默认保存或打印 token。不要将站点开发者自己的 token 写进公开的前端构建产物。支持直接传入字符串，也支持 `token: () => currentToken` 或异步获取函数；每轮上传固定使用同一个 token，避免分片过程中混用账户。
+The person using your application supplies their own token, which grants access to their account. The SDK sends `Authorization: Bearer`, omits cookies, and does not persist or log tokens by default. Do not embed the site developer's token in a public frontend bundle. You can supply a string, `token: () => currentToken`, or an asynchronous token provider. Each upload attempt uses a single token throughout to avoid switching accounts between parts.
 
 ```ts
 const client = new PicGoCloudClient({
   token: async () => getCurrentUserToken(),
-  baseUrl: 'https://api.picgo.app', // 默认值；本地开发可指向 Worker
-  timeoutMs: 30_000, // 单次 API 请求超时
-  uploadTimeoutMs: 120_000, // 单次文件/分片 PUT 超时
-  // storage: false, // 可关闭续传记录持久化
+  baseUrl: 'https://api.picgo.app', // Default; use your Worker URL for local development
+  timeoutMs: 30_000, // Timeout per API request
+  uploadTimeoutMs: 120_000, // Timeout per file or part PUT
+  // storage: false, // Disable persistent upload recovery
 })
 ```
 
-API 使用原生 fetch，可通过 `fetch` 选项注入自定义实现。上传字节使用原生 XMLHttpRequest 以提供浏览器上传进度，不经过自定义 fetch。模块导入本身不访问 DOM；实际上传需要浏览器的 Blob/File、XMLHttpRequest、Web Crypto 和 AbortSignal.any，建议在 HTTPS 或 localhost 安全上下文使用。
+API requests use native fetch; you can inject an implementation through the `fetch` option. File transfers use native XMLHttpRequest for upload progress and do not use the custom fetch implementation. Importing the module does not access the DOM. Uploads require the browser's Blob/File, XMLHttpRequest, Web Crypto, and AbortSignal.any APIs. Use an HTTPS or localhost secure context.
 
-## 上传
+## Uploading files
 
 ```ts
 const media = await client.upload(file, {
@@ -46,15 +48,15 @@ const media = await client.upload(file, {
   },
 })
 
-// Blob 没有文件名，需要显式指定。
+// A Blob has no filename, so provide one explicitly.
 await client.upload(blob, { filename: 'photo.png', contentType: 'image/png' })
 ```
 
-小于 10 MiB 使用单次预签名 PUT，大于等于 10 MiB 自动分片。分片大小使用服务端返回值，默认并发 3，可通过 `concurrency` 设置为 1–6。SDK 接受 1 byte–1 GiB，实际文件格式、类型大小限制、套餐和配额仍由服务端校验。不转换、压缩或重新编码文件。可通过 `width`、`height` 提供图片尺寸。
+Files smaller than 10 MiB use a single presigned PUT; files at or above 10 MiB automatically use multipart uploads. Part sizes come from the server. The default concurrency is 3 and can be set to 1–6 using `concurrency`. The SDK accepts files from 1 byte to 1 GiB; the server still enforces supported formats, size limits by media type, plans, and quotas. Files are not converted, compressed, or re-encoded. Use `width` and `height` to supply image dimensions.
 
-`phase` 为 `preparing`、`uploading`、`completing`、`completed`。`fraction` 仅表示文件传输比例，传输达到 100% 后还有合并和媒体入库步骤；只有 Promise 成功返回才代表上传完成。重试时传输进度可能回退。进度回调抛出的异常不会改变上传结果。
+The `phase` is `preparing`, `uploading`, `completing`, or `completed`. The `fraction` measures byte transfer only: reaching 100% may still leave multipart completion and media registration to finish. The upload is complete only when its Promise resolves. Transfer progress can decrease during retries. Exceptions thrown by progress callbacks do not affect the upload result.
 
-### 暂停、继续与取消
+### Pausing, resuming, and cancelling
 
 ```ts
 import { PicGoCloudError } from '@picgo/cloud-sdk'
@@ -66,7 +68,7 @@ cancelButton.addEventListener('click', async () => {
   try {
     await task.cancel()
   } catch (error) {
-    showError(error) // 网络失败时可再次调用 cancel() 重试清理
+    showError(error) // Call cancel() again to retry cleanup after a network failure
   }
 })
 
@@ -84,27 +86,27 @@ startButton.addEventListener('click', startOrResume)
 resumeButton.addEventListener('click', startOrResume)
 ```
 
-`createUpload()` 不立即发送请求。`start()` 开始上传；正在运行时重复调用会返回同一个 Promise。`pause()` 中断当前请求，当前 Promise 以 `kind: 'paused'` 拒绝；等待它结束后再次 `start()` 继续。`cancel()` 中断并清理未完成的分片会话，任务取消后需新建任务。清理请求失败会向调用方报告，保留记录以便再次尝试。取消不回滚已成功入库的媒体；已经传完但未入库的对象由服务端清理策略处理。
+`createUpload()` does not send requests immediately. Call `start()` to begin; repeated calls while it is running return the same Promise. `pause()` interrupts the current requests and rejects that Promise with `kind: 'paused'`; once it settles, call `start()` again to continue. `cancel()` interrupts the upload and cleans up an unfinished multipart session. Create a new task after cancellation. Cleanup failures are reported to the caller, and recovery records remain available for another attempt. Cancellation does not roll back registered media; uploaded objects that were never registered are handled by the server's cleanup policy.
 
-`task.status` 可读取 `idle`、`running`、`paused`、`cancelled`、`failed`、`completed`。如应用已有 AbortController，可选传入 `signal`；外部 signal 中断会保留续传信息，不等同于 `cancel()` 的服务端清理。已经中断的外部 signal 不能用于重新开始，应创建新任务。
+The `task.status` is `idle`, `running`, `paused`, `cancelled`, `failed`, or `completed`. If your application already uses an AbortController, you can pass its `signal`. Aborting an external signal retains recovery information and does not perform the server cleanup that `cancel()` does. An already-aborted external signal cannot be reused to restart an upload; create a new task.
 
-### 断点续传
+### Resumable uploads
 
-分片上传默认将会话及已完成分片的 ETag 写入当前站点的 localStorage，缓存有效期 24 小时。刷新页面后重新选择原文件，再调用 `upload()` 或 `createUpload().start()`，会自动恢复。SDK 以分块内容摘要识别文件，内存占用不随整个文件大小增长；准备阶段会读取文件内容。记录按 API 地址、账户和文件隔离，不包含 token、预签名 URL 或原始文件。
+By default, multipart uploads store their session and completed part ETags in the current site's localStorage, with a 24-hour cache lifetime. After refreshing the page, select the original file and call `upload()` or `createUpload().start()` to resume automatically. The SDK identifies files using chunked content hashes, reading the file during preparation without loading it all into memory. Records are isolated by API URL, account, and file. They contain no tokens, presigned URLs, or file contents.
 
-新 Worker 的 `whoami.userId` 用于账户隔离，同一账户更换 token 后仍可恢复；旧 Worker 没有该字段时使用 token 摘要隔离，更换 token 后不会命中旧记录。同一任务不允许切换账户。Web Locks 可用时阻止跨标签页同时恢复同一文件；不支持 Web Locks 时只提供当前页面内的互斥。
+Newer Workers expose `whoami.userId` for account isolation, allowing the same account to resume after changing tokens. Older Workers without this field use a token hash for isolation, so changing the token will not match previous records. A task cannot switch accounts. When available, Web Locks prevent multiple tabs from resuming the same file simultaneously; otherwise, exclusion applies only within the current page.
 
-续传需要当前站点仍保留本地记录、用户提供同一文件，且服务端会话尚未失效；不支持跨站点或跨设备恢复。浏览器存储不可用时自动降级为任务内存中的续传。`storage: false` 关闭持久化，`resume: false` 让该次上传忽略持久化记录。小文件不提供跨刷新续传，但同一任务入库失败后重试不会重复 PUT。分片上传会保留已合并待入库状态，直到入库成功才清除记录。
+Recovery requires the current site's local record, the same file, and an unexpired server session. It does not work across sites or devices. If browser storage is unavailable, recovery falls back to the task's in-memory state. Set `storage: false` to disable persistence, or `resume: false` to ignore persisted records for an upload. Small files cannot resume across page refreshes, but retrying registration on the same task does not repeat the PUT. Multipart uploads retain their merged-but-unregistered state until registration succeeds.
 
-SDK 只重试可安全重试的步骤，分片 PUT 使用最多 3 次额外重试和 1/2/4 秒退避，403 时重新获取签名 URL。媒体更新、删除及新建上传会话不会被静默重试。丢失分片合并响应时，优先尝试幂等的媒体入库以确认是否已经合并，避免直接创建另一份上传。
+The SDK retries only steps that can safely be retried. Part PUTs receive up to 3 additional attempts with 1/2/4-second backoff; a 403 triggers a new signed URL. Media updates, deletions, and upload session creation are not silently retried. If the multipart completion response is lost, the SDK first attempts idempotent media registration to determine whether the object was already assembled, rather than immediately creating another upload.
 
-## 媒体管理
+## Media management
 
-PicGo Cloud 当前的“相册”是媒体条目列表，没有相册分组实体。`media` 对应 `/api/album-items`，不使用已弃用的 `/api/media`，不提供第三方图床记录导入。
+PicGo Cloud's current album is a list of media items, with no separate album grouping entity. The `media` API maps to `/api/album-items`, does not use the deprecated `/api/media`, and does not import records from third-party image hosts.
 
-| 方法 | 返回值 |
+| Method | Returns |
 | --- | --- |
-| `client.whoami(options?)` | 当前用户资料，含新版服务端的 `userId` |
+| `client.whoami(options?)` | Current user details, including `userId` on newer servers |
 | `client.media.list(query?, options?)` | `{ items, total, limit, offset }` |
 | `client.media.get(id, options?)` | `MediaItem` |
 | `client.media.update(id, changes, options?)` | `MediaItem` |
@@ -114,19 +116,19 @@ PicGo Cloud 当前的“相册”是媒体条目列表，没有相册分组实�
 | `client.media.filters(options?)` | `{ contentTypes, types, exts }` |
 | `client.media.stats(options?)` | `{ total, types }` |
 
-所有接口返回解包后的业务数据，失败则抛异常。`options` 可传 `signal`。列表支持 `search`、`contentType`、`type`、`ext`、`fileName`、`sort` 和 `order`，`sort` 为 `newest | oldest | fileName`，`order` 为 `asc | desc`。当前服务端 `search` 仅搜索文件名。`limit` 为 1–100，`offset` 从 0 开始；批量更新和删除每次 1–100 条，不自动拆批。批量结果保留后端处理数量，请检查 `skipped`。
+All methods return unwrapped business data and throw on failure. You can pass a `signal` through `options`. Listing supports `search`, `contentType`, `type`, `ext`, `fileName`, `sort`, and `order`. The `sort` values are `newest | oldest | fileName`, and `order` is `asc | desc`. The server currently searches filenames only. The `limit` is 1–100 and `offset` starts at 0. Batch updates and deletions accept 1–100 items per request and are not automatically split. Batch results preserve the server's processing counts; check `skipped` when updating items.
 
 ```ts
 await client.media.updateMany([
   { id: firstId, fileName: 'a.png' },
-  { id: secondId, extra: { description: '截图' } },
+  { id: secondId, extra: { description: 'Screenshot' } },
 ])
 await client.media.deleteMany([firstId, secondId])
 ```
 
-媒体字段沿用服务端命名，包括 `id`、`imgUrl`、`fileName`、`type`、`contentType`、`size`、`width`、`height`、`extname`、`createdAt`、`updatedAt`、`originImgUrl`、`url`、`extra`，时间戳为毫秒。更新修改媒体元数据，不修改存储中的文件内容；不允许更新 `size`、`extname`。删除是服务端软删除，目前没有恢复接口。
+Media fields retain their server names: `id`, `imgUrl`, `fileName`, `type`, `contentType`, `size`, `width`, `height`, `extname`, `createdAt`, `updatedAt`, `originImgUrl`, `url`, and `extra`. Timestamps are in milliseconds. Updates change media metadata, not the stored file contents; `size` and `extname` cannot be updated. Deletion is a server-side soft delete, and there is currently no restore API.
 
-## 错误处理
+## Error handling
 
 ```ts
 import { PicGoCloudError } from '@picgo/cloud-sdk'
@@ -143,21 +145,21 @@ try {
 }
 ```
 
-`PicGoCloudError` 包含错误类别 `kind`、可选 HTTP `status`、后端 `code` 和原始 `cause`。服务端部分错误没有 code，可按状态码兜底。SDK 不根据错误文案决定行为，不自动清除用户 token。浏览器可能把 CORS 拒绝表现为普通网络错误；诊断时检查 API 和 R2 两处跨域配置。
+`PicGoCloudError` includes the error `kind`, optional HTTP `status`, server `code`, and original `cause`. Some server errors have no code; use the status as a fallback. The SDK does not branch on error messages or automatically clear the user's token. Browsers may report CORS rejections as ordinary network errors, so check both the API and R2 CORS configurations when troubleshooting.
 
-## 服务端接入条件
+## Server requirements
 
-SDK 不会绕过浏览器跨域。配套 picgo-hub 分支 `feat-cloud-sdk` 为 SDK 使用的端点增加第三方 Bearer CORS，同时保留 Portal Cookie 和 OAuth 回调白名单。R2 Bucket 必须允许第三方 Origin 的 PUT、签名所需请求头，并通过 `ExposeHeaders` 暴露 `ETag`。具体配置及部署验证步骤见 hub 的 SDK CORS 文档。修改源码不代表线上配置已生效。
+The SDK does not bypass browser CORS. The companion picgo-hub branch, `feat-cloud-sdk`, enables third-party Bearer CORS for the SDK's endpoints while preserving Portal cookies and the OAuth callback allowlist. The R2 bucket must allow PUT requests from third-party origins and the headers required by signing, and expose `ETag` through `ExposeHeaders`. See the hub SDK CORS documentation for configuration and deployment verification. Source changes alone do not update production configuration.
 
-业务请求始终发送给配置的 API。生产 R2 直传不携带账户 token；仅 localhost/127.0.0.1 的同源、已知 Worker 上传代理路径会添加 Bearer 以支持本地开发。
+Business requests always go to the configured API. Production R2 transfers do not include the account token. For local development, Bearer authentication is added only to recognized Worker upload proxy paths on the same localhost/127.0.0.1 origin as the API.
 
-## 开发
+## Development
 
 ```sh
 pnpm install
 pnpm check
 ```
 
-`pnpm check` 运行类型检查、ESLint、Vitest 和构建。产物为 `dist/index.js`、sourcemap 及类型声明，仅发布 ESM，无 Node polyfill。`examples/basic.html` 是可搭配本地静态服务器使用的原生浏览器示例，先执行 `pnpm build`；其中的 token 只保留在页面内存中。
+`pnpm check` runs type checking, ESLint, Vitest, and the build. Output includes `dist/index.js`, a source map, and type declarations. The package is ESM-only and contains no Node polyfills. After running `pnpm build`, serve `examples/basic.html` with a local static server for a native browser example. Its token stays in page memory.
 
-真实浏览器协议验证可运行 `pnpm build && pnpm test:browser:serve`，然后访问 `http://localhost:41780`。这个本地测试使用三个不同 Origin 模拟网页、API 和存储，检查真实 CORS 预检、XHR 进度、ETag、媒体管理以及合并后入库失败的恢复，不会访问真实账户或写入云端。页面显示 `passed: true` 代表通过，终端 Ctrl+C 停止服务。每次重新测试前重启测试服务，以重置模拟状态。
+To verify the protocol in a real browser, run `pnpm build && pnpm test:browser:serve` and open `http://localhost:41780`. This local test uses three different origins to simulate the page, API, and storage. It checks real CORS preflights, XHR progress, ETag access, media management, and recovery from registration failure after multipart completion. It does not access real accounts or write to cloud storage. The page displays `passed: true` on success. Stop the server with Ctrl+C, and restart it before each new test to reset the simulated state.

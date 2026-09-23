@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/PicGo/picgo-cloud-sdk.git" },
   "sideEffects": false,
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": ["dist", "README.md", "README_ZH.md", "LICENSE"],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
