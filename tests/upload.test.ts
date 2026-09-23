@@ -13,7 +13,7 @@ vi.mock('../src/upload/transport.js', () => ({ putBlob: putBlobMock }))
 const MIB = 1024 * 1024
 const MULTIPART_THRESHOLD = 10 * MIB
 const API_BASE_URL = 'https://api.example.test'
-const MEDIA = { id: 'media-1', imgUrl: 'https://cdn.example.test/media-1.png' }
+const MEDIA = { id: 'media-1', url: 'https://cdn.example.test/media-1.png', imgUrl: 'https://cdn.example.test/media-1.png' }
 
 interface ApiCall {
   path: string
@@ -136,6 +136,30 @@ afterEach(() => {
 })
 
 describe('PicGoCloud uploads', () => {
+  it.each([
+    { url: 'https://cdn.example.test/video.mp4' },
+    { imgUrl: 'https://cdn.example.test/video.mp4' },
+  ])('returns a required media URL for video uploads with response %j', async address => {
+    putBlobMock.mockResolvedValue({})
+    const { fetchMock } = createFetch(call => {
+      switch (call.path) {
+        case '/api/whoami': return dataResponse({ userId: 'video-user' })
+        case '/api/upload/presign': return dataResponse({
+          objectKey: 'objects/video.mp4', publicId: 'video-id', method: 'PUT',
+          uploadUrl: 'https://uploads.example.test/video.mp4', headers: { 'Content-Type': 'video/mp4' },
+        })
+        case '/api/album-items/complete': return dataResponse({ item: { id: 'video-id', contentType: 'video/mp4', ...address } })
+        default: return unexpected(call)
+      }
+    })
+    const client = new PicGoCloudClient({ token: 'token', fetch: fetchMock, storage: false })
+    const file = new File([new Uint8Array(128)], 'video.mp4', { type: 'video/mp4' })
+    const result = await client.upload(file)
+    expect(result.url).toBe('https://cdn.example.test/video.mp4')
+    expect(result.contentType).toBe('video/mp4')
+    expect(uploadCalls()[0]?.headers['Content-Type']).toBe('video/mp4')
+  })
+
   it('switches at 10 MiB, preserves presign headers, and uses server part sizes and ETags', async () => {
     const largeFile = imageFile(MULTIPART_THRESHOLD, 'large.png')
     const smallFile = imageFile(1024, 'small.png')

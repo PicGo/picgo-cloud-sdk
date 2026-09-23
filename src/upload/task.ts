@@ -2,6 +2,8 @@ import { PicGoCloudError } from '../errors.js'
 import { ApiErrorCode } from '../api-error-codes.js'
 import type { HttpClient } from '../http.js'
 import type { MediaItem } from '../types.js'
+import { normalizeMediaItem } from '../media-item.js'
+import type { MediaItemResponse } from '../media-item.js'
 import { digest, fingerprint, ResumeStore, throwIfAborted, withUploadLock } from './storage.js'
 import { putBlob } from './transport.js'
 import type { MultipartSession, PresignResult, SignedPart, StoredUpload, UploadConfig, UploadOptions, UploadPhase, UploadStatus } from './types.js'
@@ -215,9 +217,9 @@ export class UploadTask {
   private async finalize(http: HttpClient, signal: AbortSignal): Promise<MediaItem> {
     const state = this.state!
     this.emit('completing', this.file.size)
-    let result: { item: MediaItem }
+    let result: { item: MediaItemResponse }
     try {
-      result = await retry(() => http.request<{ item: MediaItem }>('/api/album-items/complete', {
+      result = await retry(() => http.request<{ item: MediaItemResponse }>('/api/album-items/complete', {
         method: 'POST', signal,
         body: { objectKey: state.objectKey, publicId: state.publicId, filename: this.filename, width: this.options.width, height: this.options.height },
       }), signal)
@@ -225,12 +227,13 @@ export class UploadTask {
       if (state.phase === 'uploaded' && error instanceof PicGoCloudError && error.status === 404) this.clear()
       throw error
     }
-    if (!result?.item || typeof result.item.id !== 'string' || typeof result.item.imgUrl !== 'string') {
+    if (!result?.item) {
       protocol('Invalid media completion response')
     }
+    const item = normalizeMediaItem(result.item)
     this.clear()
     this.emit('completed', this.file.size)
-    return result.item
+    return item
   }
 
   private async single(http: HttpClient, signal: AbortSignal): Promise<MediaItem> {

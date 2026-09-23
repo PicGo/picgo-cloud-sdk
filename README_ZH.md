@@ -18,7 +18,7 @@ const client = new PicGoCloudClient({
 })
 
 const media = await client.upload(file)
-console.log(media.id, media.imgUrl)
+console.log(media.id, media.url)
 
 const page = await client.media.list({ limit: 20, offset: 0, search: '旅行' })
 await client.media.update(media.id, { fileName: '旅行照片.jpg' })
@@ -124,7 +124,30 @@ await client.media.updateMany([
 await client.media.deleteMany([firstId, secondId])
 ```
 
-`MediaItem` 包含 `id`、`imgUrl`，以及可选的 `fileName`、`type`、`contentType`、`size`、`width`、`height`、`extname`、`createdAt`、`updatedAt`、`originImgUrl`、`url`、`extra` 等元数据。时间戳为毫秒。更新修改元数据，不修改文件内容；不允许更新 `size`、`extname`。删除后条目将不再出现在媒体列表中，SDK 不提供恢复操作。
+上传和媒体查询返回 `MediaItem`。图片、视频或其他文件都通过 `url` 访问，可以根据 `contentType` 选择展示方式。
+
+```ts
+interface MediaItem {
+  id: string
+  url: string                      // 媒体访问地址，始终有值
+  fileName?: string
+  type?: string                    // 上传来源，例如 "picgo-cloud"
+  contentType?: string             // MIME 类型，例如 "image/png"、"video/mp4"
+  size?: number                    // 文件大小，单位 byte
+  width?: number                   // 宽度，单位 px，可用时返回
+  height?: number                  // 高度，单位 px，可用时返回
+  extname?: string                 // 文件扩展名，例如 ".mp4"
+  createdAt?: number               // Unix 时间戳，单位毫秒
+  updatedAt?: number               // Unix 时间戳，单位毫秒
+  originImgUrl?: string            // 原始地址，可用时返回
+  extra?: Record<string, unknown>  // 扩展元数据
+
+  /** @deprecated 请使用 url，此字段仅用于兼容。 */
+  imgUrl: string
+}
+```
+
+可以通过 `import type { MediaItem } from '@picgo/cloud-sdk'` 导入类型。更新修改元数据，不修改文件内容；不允许更新 `size`、`extname`。删除后条目将不再出现在媒体列表中，SDK 不提供恢复操作。
 
 ## 错误处理
 

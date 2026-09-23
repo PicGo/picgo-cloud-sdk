@@ -15,6 +15,9 @@ export interface WhoAmI {
 
 export interface MediaItem {
   id: string
+  /** Media URL for images, videos, and other files. */
+  url: string
+  /** @deprecated Use url for media access. Retained for compatibility. */
   imgUrl: string
   fileName?: string
   type?: string
@@ -26,7 +29,6 @@ export interface MediaItem {
   createdAt?: number
   updatedAt?: number
   originImgUrl?: string
-  url?: string
   extra?: Record<string, unknown>
 }
 

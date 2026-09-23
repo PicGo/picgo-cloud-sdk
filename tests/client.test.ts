@@ -223,7 +223,7 @@ describe('HttpClient', () => {
 
 describe('MediaService', () => {
   it('maps media operations to album-item endpoints and request bodies', async () => {
-    const mediaItem = { id: 'media-id', imgUrl: 'https://img.test/a.png' }
+    const mediaItem = { id: 'media-id', url: 'https://img.test/a.png', imgUrl: 'https://img.test/a.png' }
     const fetchMock = vi.fn<typeof fetch>()
     fetchMock
       .mockResolvedValueOnce(jsonResponse({

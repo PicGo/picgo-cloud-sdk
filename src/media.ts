@@ -1,5 +1,7 @@
 import { PicGoCloudError } from './errors.js'
 import type { HttpClient } from './http.js'
+import { normalizeMediaItem } from './media-item.js'
+import type { MediaItemResponse } from './media-item.js'
 import type {
   MediaBulkDeleteResult,
   MediaBulkUpdateItem,
@@ -14,7 +16,9 @@ import type {
   RequestOptions,
 } from './types.js'
 
-type MediaItemResult = { item: MediaItem }
+type MediaItemResult = { item: MediaItemResponse }
+type MediaListResponse = Omit<MediaListResult, 'items'> & { items: MediaItemResponse[] }
+type MediaBulkUpdateResponse = Omit<MediaBulkUpdateResult, 'items'> & { items: MediaItemResponse[] }
 const RESERVED_MEDIA_IDS = new Set(['complete', 'filters', 'stats'])
 
 function validation(message: string): never {
@@ -70,10 +74,11 @@ export class MediaService {
     addQueryValue(params, 'order', query.order)
 
     const queryString = params.toString()
-    return await this.http.request<MediaListResult>(
+    const result = await this.http.request<MediaListResponse>(
       `/api/album-items${queryString ? `?${queryString}` : ''}`,
       { signal: options.signal },
     )
+    return { ...result, items: result.items.map(normalizeMediaItem) }
   }
 
   async get(id: string, options: RequestOptions = {}): Promise<MediaItem> {
@@ -82,7 +87,7 @@ export class MediaService {
       `/api/album-items/${encodeURIComponent(id)}`,
       { signal: options.signal },
     )
-    return result.item
+    return normalizeMediaItem(result.item)
   }
 
   async update(id: string, changes: MediaUpdate, options: RequestOptions = {}): Promise<MediaItem> {
@@ -91,7 +96,7 @@ export class MediaService {
       `/api/album-items/${encodeURIComponent(id)}`,
       { method: 'PATCH', body: changes, signal: options.signal },
     )
-    return result.item
+    return normalizeMediaItem(result.item)
   }
 
   async updateMany(
@@ -105,11 +110,12 @@ export class MediaService {
       }
       validateMediaId(item.id)
     }
-    return await this.http.request<MediaBulkUpdateResult>('/api/album-items', {
+    const result = await this.http.request<MediaBulkUpdateResponse>('/api/album-items', {
       method: 'PATCH',
       body: { items },
       signal: options.signal,
     })
+    return { ...result, items: result.items.map(normalizeMediaItem) }
   }
 
   async delete(id: string, options: RequestOptions = {}): Promise<MediaDeleteResult> {

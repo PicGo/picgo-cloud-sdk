@@ -18,7 +18,7 @@ const client = new PicGoCloudClient({
 })
 
 const media = await client.upload(file)
-console.log(media.id, media.imgUrl)
+console.log(media.id, media.url)
 
 const page = await client.media.list({ limit: 20, offset: 0, search: 'travel' })
 await client.media.update(media.id, { fileName: 'travel-photo.jpg' })
@@ -124,7 +124,30 @@ await client.media.updateMany([
 await client.media.deleteMany([firstId, secondId])
 ```
 
-`MediaItem` includes `id`, `imgUrl`, and optional metadata such as `fileName`, `type`, `contentType`, `size`, `width`, `height`, `extname`, `createdAt`, `updatedAt`, `originImgUrl`, `url`, and `extra`. Timestamps are in milliseconds. Updates change metadata, not the file contents; `size` and `extname` cannot be updated. Deleted items disappear from the media list. The SDK does not provide a restore operation.
+Uploads and media queries return `MediaItem`. Use `url` to access images, videos, or other files, and `contentType` to choose how to display them.
+
+```ts
+interface MediaItem {
+  id: string
+  url: string                      // Media URL; always present
+  fileName?: string
+  type?: string                    // Upload source, e.g. "picgo-cloud"
+  contentType?: string             // MIME type, e.g. "image/png" or "video/mp4"
+  size?: number                    // Bytes
+  width?: number                   // Pixels, when available
+  height?: number                  // Pixels, when available
+  extname?: string                 // File extension, e.g. ".mp4"
+  createdAt?: number               // Unix timestamp in milliseconds
+  updatedAt?: number               // Unix timestamp in milliseconds
+  originImgUrl?: string            // Original URL, when available
+  extra?: Record<string, unknown>  // Additional metadata
+
+  /** @deprecated Use url. Retained for compatibility. */
+  imgUrl: string
+}
+```
+
+Import this type with `import type { MediaItem } from '@picgo/cloud-sdk'`. Updates change metadata, not file contents; `size` and `extname` cannot be updated. Deleted items disappear from the media list. The SDK does not provide a restore operation.
 
 ## Error handling
 
