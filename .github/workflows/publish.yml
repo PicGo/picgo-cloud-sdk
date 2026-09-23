@@ -1,0 +1,71 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify and pack
+    runs-on: ubuntu-latest
+    outputs:
+      dist-tag: ${{ steps.release.outputs.dist-tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v4
+      - name: Validate release tag and source
+        id: release
+        run: node scripts/release.mjs
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - name: Pack the verified build
+        run: pnpm pack --pack-destination .release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: .release/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish with npm trusted publishing
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Install npm with OIDC support
+        run: npm install --global npm@11
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: .release
+      - name: Publish the verified tarball
+        run: npm publish .release/*.tgz --access public --provenance --ignore-scripts --tag "$DIST_TAG"
+        env:
+          DIST_TAG: ${{ needs.verify.outputs.dist-tag }}

@@ -5,6 +5,7 @@
   "type": "module",
   "license": "MIT",
   "repository": { "type": "git", "url": "git+https://github.com/PicGo/picgo-cloud-sdk.git" },
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org" },
   "sideEffects": false,
   "files": ["dist", "README.md", "README_ZH.md", "LICENSE"],
   "main": "./dist/index.js",
@@ -16,7 +17,7 @@
     "build": "rolldown -c && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run && node --test scripts/dev-server.test.mjs",
+    "test": "vitest run && node --test scripts/*.test.mjs",
     "test:browser:serve": "node scripts/browser-smoke.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "prepublishOnly": "pnpm check"
