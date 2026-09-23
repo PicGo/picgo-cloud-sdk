@@ -153,11 +153,36 @@ SDK 不会绕过浏览器跨域。配套 picgo-hub 分支 `feat-cloud-sdk` 为 S
 
 ## 开发
 
+开发需要 Node.js 22.18+，推荐 Node.js 24。环境文件由 Node.js 原生加载，无需安装 dotenv。
+
 ```sh
 pnpm install
 pnpm check
 ```
 
-`pnpm check` 运行类型检查、ESLint、Vitest 和构建。产物为 `dist/index.js`、sourcemap 及类型声明，仅发布 ESM，无 Node polyfill。`examples/basic.html` 是可搭配本地静态服务器使用的原生浏览器示例，先执行 `pnpm build`；其中的 token 只保留在页面内存中。
+`pnpm check` 运行类型检查、ESLint、Vitest、本地开发服务器测试和构建。产物为 `dist/index.js`、sourcemap 及类型声明，仅发布 ESM，无 Node polyfill。
+
+### 连接真实后端测试
+
+将 `.env.example` 复制为 `.env`，设置要测试的 API 地址：
+
+```dotenv
+PICGO_API_URL=https://pr-89-dev-api.picgo.app
+PICGO_DEV_PORT=5175
+```
+
+```sh
+pnpm dev
+```
+
+打开 `http://localhost:5175`。测试页会读取配置的 API 地址，提供验证 token、上传、暂停/继续/取消、媒体列表、详情、重命名和删除。请在页面中输入该环境下你自己的 token，token 仅保留在内存中。上传成功后会自动填写媒体 ID，方便继续操作。这个页面连接真实后端，操作会作用于该账户的媒体数据。
+
+建议先验证 token，再分别上传小于 10 MiB 和大于等于 10 MiB 的文件。对分片上传测试暂停与继续，再刷新页面、重新选择同一文件测试恢复。通过媒体操作按钮验证上传后的条目能查询、重命名和删除。网速太快不方便中断时，可在浏览器开发者工具中启用网络限速。
+
+切换到公共开发环境时，将 `PICGO_API_URL` 改为 `https://dev-api.picgo.app` 后重启 `pnpm dev`。已有的 shell 环境变量优先于 `.env`。修改 SDK 源码会自动重新构建，刷新页面即可加载；修改 `.env` 需要重启。`.env` 已被 Git 忽略，只有 `PICGO_API_URL` 会提供给浏览器，其他环境变量不会暴露。
+
+请求由浏览器直接发送至选定后端和 R2，不经过本地 API 代理。默认端口 5175 用于验证第三方跨域，不复用 Portal 已允许的本地域名。目标后端需要部署 Worker CORS 改动，对应 R2 Bucket 需要允许 PUT 并暴露 `ETag`。`.env` 仅配置本地测试页，接入已发布 SDK 的应用仍需显式传入 `baseUrl`。
+
+### 使用本地模拟服务测试
 
 真实浏览器协议验证可运行 `pnpm build && pnpm test:browser:serve`，然后访问 `http://localhost:41780`。这个本地测试使用三个不同 Origin 模拟网页、API 和存储，检查真实 CORS 预检、XHR 进度、ETag、媒体管理以及合并后入库失败的恢复，不会访问真实账户或写入云端。页面显示 `passed: true` 代表通过，终端 Ctrl+C 停止服务。每次重新测试前重启测试服务，以重置模拟状态。

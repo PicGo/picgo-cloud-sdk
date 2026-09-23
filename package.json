@@ -12,10 +12,11 @@
   "types": "./dist/index.d.ts",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "scripts": {
+    "dev": "pnpm build && node --env-file-if-exists=.env scripts/dev.mjs",
     "build": "rolldown -c && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/dev-server.test.mjs",
     "test:browser:serve": "node scripts/browser-smoke.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "prepublishOnly": "pnpm check"

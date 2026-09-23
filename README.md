@@ -155,11 +155,36 @@ Business requests always go to the configured API. Production R2 transfers do no
 
 ## Development
 
+Use Node.js 22.18+ (Node.js 24 recommended) for development. Environment files are loaded by Node.js itself; no dotenv package is needed.
+
 ```sh
 pnpm install
 pnpm check
 ```
 
-`pnpm check` runs type checking, ESLint, Vitest, and the build. Output includes `dist/index.js`, a source map, and type declarations. The package is ESM-only and contains no Node polyfills. After running `pnpm build`, serve `examples/basic.html` with a local static server for a native browser example. Its token stays in page memory.
+`pnpm check` runs type checking, ESLint, Vitest, local development server tests, and the build. Output includes `dist/index.js`, a source map, and type declarations. The package is ESM-only and contains no Node polyfills.
+
+### Test against a real backend
+
+Copy `.env.example` to `.env` and set the API URL for the environment you want to test:
+
+```dotenv
+PICGO_API_URL=https://pr-89-dev-api.picgo.app
+PICGO_DEV_PORT=5175
+```
+
+```sh
+pnpm dev
+```
+
+Open `http://localhost:5175`. The playground loads the configured API URL and provides token verification, uploads, pause/resume/cancel, media listing, details, renaming, and deletion. Enter your own token for that backend in the page; it stays in memory. Uploaded items automatically populate the media ID field for follow-up operations. Operations on this page use the real backend and affect that account's media.
+
+Start by verifying the token, then upload a file smaller than 10 MiB and one at or above 10 MiB. Test pausing and resuming a multipart upload, and refresh the page and reselect the same file to test recovery. Use the media buttons to verify that the uploaded item's metadata can be read, renamed, and deleted. If a fast connection makes interruption difficult, throttle the network in browser developer tools.
+
+To switch to the shared development environment, set `PICGO_API_URL=https://dev-api.picgo.app` and restart `pnpm dev`. Existing shell environment variables take precedence over `.env`. The dev command rebuilds the SDK when source files change; refresh the page to load the new build. Changes to `.env` require a server restart. `.env` is ignored by Git; only `PICGO_API_URL` is exposed to the browser, not other environment variables.
+
+Requests go directly from the browser to the selected backend and R2, without a local API proxy. Port 5175 deliberately exercises third-party CORS instead of the Portal's existing local-origin allowlist. The Worker CORS change must be deployed to the selected backend, and its R2 bucket must allow PUT and expose `ETag`. The `.env` setting configures only this development playground; applications consuming the published SDK still pass `baseUrl` explicitly.
+
+### Test with local protocol fixtures
 
 To verify the protocol in a real browser, run `pnpm build && pnpm test:browser:serve` and open `http://localhost:41780`. This local test uses three different origins to simulate the page, API, and storage. It checks real CORS preflights, XHR progress, ETag access, media management, and recovery from registration failure after multipart completion. It does not access real accounts or write to cloud storage. The page displays `passed: true` on success. Stop the server with Ctrl+C, and restart it before each new test to reset the simulated state.
