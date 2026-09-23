@@ -34,14 +34,35 @@ After verifying the first OIDC publication, remove unused publishing tokens. You
 
 ## Subsequent releases
 
-Update `package.json` to a new version, merge the version change into `main`, and tag that exact commit. For example, after merging version `0.1.1`:
+This repository uses `@picgo/bump-version`, matching PicGo-Core. Use `pnpm cz` to write commits in the PicGo format; the commit-message hook validates them. For example:
+
+```text
+:sparkles: Feature(upload): add resumable uploads
+:bug: Fix(media): preserve the current media URL
+```
+
+The changelog generator recognizes this convention. Earlier Angular-style commits are not automatically converted. Use a PicGo-format title when squash-merging a feature PR so its change appears in the changelog.
+
+Preview the next release without changing files, creating a commit, or tagging:
+
+```sh
+pnpm release:dry
+pnpm release:dry --type minor
+```
+
+From a clean, up-to-date `main`, run `pnpm release` to update the version, generate `CHANGELOG.md`, create a release commit, and create the annotated `v<version>` tag. For example, when the current version is `0.1.0`:
 
 ```sh
 git switch main
 git pull --ff-only
-git tag v0.1.1
+pnpm release --type patch
+git push origin main
 git push origin v0.1.1
 ```
+
+Use `pnpm release --version 0.2.0-beta.1` for an exact prerelease version, or add `--yes` to skip the version confirmation. Review the resulting version and changelog before pushing. The release command prepares the Git release; the tag push triggers npm publication. Do not use bump-version's `--push` here: version 3.0.0 hardcodes `origin master`, while this repository uses `main`.
+
+If changes to `main` require a pull request, run `pnpm release --no-tag` on a release branch, merge the version/changelog commit, and create the corresponding tag on the merged `main` commit. The tag must point to the commit that contains the published version.
 
 Pushing a `v*` tag starts `.github/workflows/publish.yml`. It checks that the repository is public, the tag exactly matches `v<package.json version>`, and the tagged commit is already in `main`. It then installs locked dependencies, runs type checking, lint, tests, and the build, and packs the result. A separate job publishes that verified tarball using OIDC and provenance, without rerunning package scripts in the publishing job.
 
@@ -55,7 +76,7 @@ pnpm pack --pack-destination .release
 npm publish .release/picgo-cloud-sdk-0.1.0.tgz --dry-run --ignore-scripts --access public
 ```
 
-Replace the tarball version with the version being tested. These commands build and inspect the package without publishing it. The package allowlist contains only `dist`, the two READMEs, and the license, plus npm's required package metadata; local `.env` files, examples, and maintenance scripts are not shipped.
+Replace the tarball version with the version being tested. These commands build and inspect the package without publishing it. The package allowlist contains only `dist`, the two READMEs, `CHANGELOG.md` once generated, and the license, plus npm's required package metadata; local `.env` files, examples, and maintenance scripts are not shipped.
 
 ## References
 
