@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PicGo Cloud SDK 示例</title>
+<style>body{font:16px system-ui;max-width:720px;margin:48px auto;padding:0 20px}label{display:block;margin:18px 0}input{padding:8px}button{padding:8px 16px;margin-right:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere}progress{width:100%;margin:20px 0}</style>
+<h1>PicGo Cloud SDK</h1>
+<p>提供你自己的 token，选择文件上传。暂停后可继续，刷新后重新选择同一文件可续传。</p>
+<label>API <input id="api" type="url" placeholder="PICGO_API_URL" size="48" required></label>
+<label>Token <input id="token" type="password" autocomplete="off" size="36"></label>
+<label>文件 <input id="file" type="file"></label>
+<button id="whoami">验证 token</button><button id="start">上传 / 继续</button><button id="pause">暂停</button><button id="cancel">取消</button><button id="list">媒体列表</button>
+<label>媒体 ID <input id="media-id" size="40"></label>
+<label>文件名 <input id="filename" size="40" placeholder="用于测试重命名"></label>
+<button id="get">媒体详情</button><button id="update">重命名</button><button id="delete">删除所填 ID 的媒体</button>
+<progress id="progress" max="1" value="0"></progress>
+<pre id="output" aria-live="polite"></pre>
+<script type="module">
+  import { PicGoCloudClient } from '../dist/index.js'
+  const element = id => document.getElementById(id)
+  const show = value => { element('output').textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2) }
+  let task
+  let sourceFile
+  let baseUrl
+  try {
+    const response = await fetch('/config.json', { cache: 'no-store' })
+    if (!response.ok) throw new Error('本地配置不可用，请运行 pnpm dev，或手动填写 API 地址。')
+    const config = await response.json()
+    element('api').value = config.apiUrl
+    show(`已连接配置：${config.apiUrl}。输入此环境的 token 后，先点击「验证 token」。`)
+  } catch (error) { show(error.message) }
+  const client = () => new PicGoCloudClient({ token: () => element('token').value, baseUrl: element('api').value })
+  element('start').addEventListener('click', async () => {
+    try {
+      const file = element('file').files[0]
+      if (!file) { show('请选择文件'); return }
+      if (!task || sourceFile !== file || baseUrl !== element('api').value || task.status === 'cancelled') {
+        sourceFile = file
+        baseUrl = element('api').value
+        task = client().createUpload(file, { onProgress(progress) {
+          element('progress').value = progress.fraction
+          show(progress)
+        } })
+      }
+      const media = await task.start()
+      element('media-id').value = media.id
+      element('filename').value = media.fileName ?? file.name
+      show(media)
+    } catch (error) { show(`${error.kind ?? 'error'}: ${error.message}`) }
+  })
+  element('pause').addEventListener('click', () => task?.pause())
+  element('cancel').addEventListener('click', async () => {
+    try { await task?.cancel(); show('已取消') } catch (error) { show(error.message) }
+  })
+  element('list').addEventListener('click', async () => {
+    try { show(await client().media.list({ limit: 20 })) } catch (error) { show(error.message) }
+  })
+  element('whoami').addEventListener('click', async () => {
+    try { show(await client().whoami()) } catch (error) { show(`${error.kind}: ${error.status ?? ''} ${error.message}`) }
+  })
+  element('get').addEventListener('click', async () => {
+    try { show(await client().media.get(element('media-id').value)) } catch (error) { show(error.message) }
+  })
+  element('update').addEventListener('click', async () => {
+    try { show(await client().media.update(element('media-id').value, { fileName: element('filename').value })) } catch (error) { show(error.message) }
+  })
+  element('delete').addEventListener('click', async () => {
+    try { show(await client().media.delete(element('media-id').value)) } catch (error) { show(error.message) }
+  })
+</script>
+</html>
