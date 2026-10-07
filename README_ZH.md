@@ -39,6 +39,18 @@ const client = new PicGoCloudClient({
 
 API 使用原生 fetch，可通过 `fetch` 选项注入自定义实现。上传字节使用原生 XMLHttpRequest 以提供浏览器上传进度，不经过自定义 fetch。模块导入本身不访问 DOM；实际上传需要浏览器的 Blob/File、XMLHttpRequest、Web Crypto 和 AbortSignal.any，建议在 HTTPS 或 localhost 安全上下文使用。
 
+## 兑换会员（OAuth）
+
+```ts
+const client = new PicGoCloudClient({ token: async () => getOAuthAccessToken() })
+const { entitlementId } = await client.redeem({ code: voucherCode })
+// 可选取消：client.redeem({ code: voucherCode }, { signal })
+```
+
+需要具备 `entitlements:redeem` 的 OAuth access token，以及支持 `POST /api/redeem` 的 Worker。提交即确认兑换，权益只发给 token 对应的用户，不依赖浏览器当前登录账号，不接受 `userId`。client secret 和 refresh token 必须留在合作方后端，浏览器 token provider 只取得短期 access token。
+
+老授权需要用户明确同意新增权限，刷新旧 token 不会自动获得权限。有生效会员时拒绝兑换且不消耗兑换码；同一用户重试已成功的兑换返回原 entitlement。失败抛出带 `status`、`code` 的 `PicGoCloudError`，例如 HTTP 409 / `REDEMPTION_ACTIVE_MEMBERSHIP`。SDK 不自动重试兑换。此方法是新增功能，已发布的 `0.1.0` 包尚不包含它。
+
 ## 上传
 
 ```ts

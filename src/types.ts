@@ -4,6 +4,14 @@ export interface RequestOptions {
   signal?: AbortSignal
 }
 
+export interface RedeemInput {
+  code: string
+}
+
+export interface RedeemResult {
+  entitlementId: string
+}
+
 export interface WhoAmI {
   /** Available on current Workers; optional for compatibility with older deployments. */
   userId?: string

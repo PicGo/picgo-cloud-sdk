@@ -39,6 +39,18 @@ const client = new PicGoCloudClient({
 
 API requests use native fetch; you can inject an implementation through the `fetch` option. File transfers use native XMLHttpRequest for upload progress and do not use the custom fetch implementation. Importing the module does not access the DOM. Uploads require the browser's Blob/File, XMLHttpRequest, Web Crypto, and AbortSignal.any APIs. Use an HTTPS or localhost secure context.
 
+## Redeeming membership vouchers (OAuth)
+
+```ts
+const client = new PicGoCloudClient({ token: async () => getOAuthAccessToken() })
+const { entitlementId } = await client.redeem({ code: voucherCode })
+// Optional cancellation: client.redeem({ code: voucherCode }, { signal })
+```
+
+Requires an OAuth access token with `entitlements:redeem` and a Worker that supports `POST /api/redeem`. Submission confirms redemption for the token's user, not the browser's logged-in account. No `userId` parameter is accepted. Keep client secrets and refresh tokens on the partner backend; the browser token provider should return only short-lived access tokens.
+
+Existing grants must obtain explicit consent for this new scope. Refreshing an old token does not add permissions. Active membership blocks redemption without consuming the voucher; a retry by the same user after successful redemption returns the original entitlement. API failures throw `PicGoCloudError` with `status` and `code` (for example `REDEMPTION_ACTIVE_MEMBERSHIP`, HTTP 409). The SDK does not automatically retry redemption. This method is new and is not included in the previously published `0.1.0` package.
+
 ## Uploading files
 
 ```ts
