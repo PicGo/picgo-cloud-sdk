@@ -39,6 +39,31 @@ const client = new PicGoCloudClient({
 
 API 使用原生 fetch，可通过 `fetch` 选项注入自定义实现。上传字节使用原生 XMLHttpRequest 以提供浏览器上传进度，不经过自定义 fetch。模块导入本身不访问 DOM；实际上传需要浏览器的 Blob/File、XMLHttpRequest、Web Crypto 和 AbortSignal.any，建议在 HTTPS 或 localhost 安全上下文使用。
 
+## 合作方服务端 OAuth
+
+`PicGoCloudOAuth` 运行在你的后端（Node 20+ 或任何提供 fetch 与 Web Crypto 的运行时）。它需要 client secret，切勿打包到浏览器。
+
+```ts
+import { PicGoCloudOAuth, PicGoCloudClient } from '@picgo/cloud-sdk'
+
+const oauth = new PicGoCloudOAuth({ baseUrl, clientId, clientSecret })
+
+// 1. 发起：把 state 和 codeVerifier 存进服务端会话，再把用户重定向到 url
+const { url, state, codeVerifier } = await oauth.createAuthorization({ redirectUri, scopes: ['account:read', 'files:upload'] })
+
+// 2. 回调：先比对返回的 state，再用授权码换令牌
+const tokens = await oauth.exchangeCode({ code, codeVerifier, redirectUri })
+await saveEncrypted(userId, tokens.refreshToken)
+
+// 3. 之后任何时候，无需用户在场
+const client = new PicGoCloudClient({ baseUrl, token: oauth.tokenProvider(() => loadRefreshToken(userId)) })
+await client.whoami()
+
+// 4. 解除关联：先吊销，再删除本地记录
+await oauth.revoke(refreshToken)
+```
+
+access token 有效期 10 分钟。refresh token 不过期，刷新时也不轮换，请视为长期凭证：加密存储，不要写入日志或返回给浏览器。`tokenProvider()` 会缓存 access token 至过期前 30 秒，并让并发请求共享同一次刷新；每个用户创建一个 provider。如需自行缓存，可直接调用 `oauth.refresh(refreshToken)`。用户在 PicGo Cloud 撤销授权后，刷新会抛出 `kind: 'authentication'`、`code: 'invalid_grant'` 的 `PicGoCloudError`：请删除已存的 refresh token 并引导用户重新授权。浏览器应从你的后端获取短期 access token，而不是直接调用这些方法。
 ## 兑换会员（OAuth）
 
 ```ts

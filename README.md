@@ -39,6 +39,32 @@ const client = new PicGoCloudClient({
 
 API requests use native fetch; you can inject an implementation through the `fetch` option. File transfers use native XMLHttpRequest for upload progress and do not use the custom fetch implementation. Importing the module does not access the DOM. Uploads require the browser's Blob/File, XMLHttpRequest, Web Crypto, and AbortSignal.any APIs. Use an HTTPS or localhost secure context.
 
+## Server-side OAuth for partners
+
+`PicGoCloudOAuth` runs on your backend (Node 20+ or any runtime with fetch and Web Crypto). It needs the client secret, so never ship it to a browser.
+
+```ts
+import { PicGoCloudOAuth, PicGoCloudClient } from '@picgo/cloud-sdk'
+
+const oauth = new PicGoCloudOAuth({ baseUrl, clientId, clientSecret })
+
+// 1. Start: store state + codeVerifier in the server session, redirect the user to url
+const { url, state, codeVerifier } = await oauth.createAuthorization({ redirectUri, scopes: ['account:read', 'files:upload'] })
+
+// 2. Callback: compare the returned state, then exchange the code
+const tokens = await oauth.exchangeCode({ code, codeVerifier, redirectUri })
+await saveEncrypted(userId, tokens.refreshToken)
+
+// 3. Any time later, without the user present
+const client = new PicGoCloudClient({ baseUrl, token: oauth.tokenProvider(() => loadRefreshToken(userId)) })
+await client.whoami()
+
+// 4. Unlink: revoke, then delete your copy
+await oauth.revoke(refreshToken)
+```
+
+Access tokens last 10 minutes. Refresh tokens do not expire and are not rotated on refresh, so treat them as long-lived credentials: store them encrypted and never log them or send them to the browser. `tokenProvider()` caches the access token until 30 seconds before expiry and shares one refresh between concurrent requests; create one provider per user. `oauth.refresh(refreshToken)` returns tokens directly if you manage caching yourself. When the user revokes access in PicGo Cloud, refreshing throws `PicGoCloudError` with `kind: 'authentication'` and `code: 'invalid_grant'`: delete the stored refresh token and ask the user to authorize again. Browsers should get short-lived access tokens from your backend instead of calling these methods.
+
 ## Redeeming membership vouchers (OAuth)
 
 ```ts

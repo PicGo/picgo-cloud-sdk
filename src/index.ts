@@ -1,6 +1,8 @@
 export { PicGoCloudClient } from './client.js'
 export { ApiErrorCode } from './api-error-codes.js'
 export type { PicGoCloudClientOptions } from './client.js'
+export { PicGoCloudOAuth } from './oauth.js'
+export type { PicGoCloudOAuthOptions, OAuthTokens, OAuthAuthorizationRequest } from './oauth.js'
 export { PicGoCloudError, isPicGoCloudError } from './errors.js'
 export type { PicGoCloudErrorKind, PicGoCloudErrorOptions } from './errors.js'
 export type * from './types.js'
