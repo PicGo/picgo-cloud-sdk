@@ -43,6 +43,8 @@ jobs:
           name: npm-package
           path: .release/*.tgz
           if-no-files-found: error
+          # .release is a dot directory, which upload-artifact v4 skips by default.
+          include-hidden-files: true
           retention-days: 7
 
   publish:
