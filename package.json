@@ -1,6 +1,6 @@
 {
   "name": "@picgo/cloud-sdk",
-  "version": "0.2.0-beta.0",
+  "version": "0.2.0-beta.1",
   "description": "PicGo Cloud uploads and media management for modern browsers",
   "type": "module",
   "license": "MIT",
