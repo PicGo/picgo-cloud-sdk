@@ -1,8 +1,8 @@
 import { PicGoCloudError, isPicGoCloudError } from './errors.js'
 import type { TokenProvider } from './types.js'
 
-const DEFAULT_BASE_URL = 'https://api.picgo.app'
-const DEFAULT_TIMEOUT_MS = 30_000
+export const DEFAULT_BASE_URL = 'https://api.picgo.app'
+export const DEFAULT_TIMEOUT_MS = 30_000
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
@@ -26,7 +26,7 @@ type ApiEnvelope = {
   message?: unknown
 } & Record<string, unknown>
 
-function normalizeBaseUrl(value: string): string {
+export function normalizeBaseUrl(value: string): string {
   let url: URL
   try {
     url = new URL(value)
