@@ -63,7 +63,7 @@ await client.whoami()
 await oauth.revoke(refreshToken)
 ```
 
-Access tokens last 10 minutes. Refresh tokens do not expire and are not rotated on refresh, so treat them as long-lived credentials: store them encrypted and never log them or send them to the browser. `tokenProvider()` caches the access token until 30 seconds before expiry and shares one refresh between concurrent requests; create one provider per user. `oauth.refresh(refreshToken)` returns tokens directly if you manage caching yourself. When the user revokes access in PicGo Cloud, refreshing throws `PicGoCloudError` with `kind: 'authentication'` and `code: 'invalid_grant'`: delete the stored refresh token and ask the user to authorize again. Browsers should get short-lived access tokens from your backend instead of calling these methods.
+Access tokens currently last one hour (always use `expiresIn`/`expiresAt` rather than assuming). Refresh tokens do not expire and are not rotated on refresh, so treat them as long-lived credentials: store them encrypted and never log them or send them to the browser. `tokenProvider()` caches the access token until 30 seconds before expiry and shares one refresh between concurrent requests; create one provider per user. `oauth.refresh(refreshToken)` returns tokens directly if you manage caching yourself. When the user revokes access in PicGo Cloud, refreshing throws `PicGoCloudError` with `kind: 'authentication'` and `code: 'invalid_grant'`: delete the stored refresh token and ask the user to authorize again. Browsers should get short-lived access tokens from your backend instead of calling these methods.
 
 ## Redeeming membership vouchers (OAuth)
 

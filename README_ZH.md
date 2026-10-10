@@ -63,7 +63,7 @@ await client.whoami()
 await oauth.revoke(refreshToken)
 ```
 
-access token 有效期 10 分钟。refresh token 不过期，刷新时也不轮换，请视为长期凭证：加密存储，不要写入日志或返回给浏览器。`tokenProvider()` 会缓存 access token 至过期前 30 秒，并让并发请求共享同一次刷新；每个用户创建一个 provider。如需自行缓存，可直接调用 `oauth.refresh(refreshToken)`。用户在 PicGo Cloud 撤销授权后，刷新会抛出 `kind: 'authentication'`、`code: 'invalid_grant'` 的 `PicGoCloudError`：请删除已存的 refresh token 并引导用户重新授权。浏览器应从你的后端获取短期 access token，而不是直接调用这些方法。
+access token 目前有效期 1 小时（请以 `expiresIn`/`expiresAt` 为准，不要写死）。refresh token 不过期，刷新时也不轮换，请视为长期凭证：加密存储，不要写入日志或返回给浏览器。`tokenProvider()` 会缓存 access token 至过期前 30 秒，并让并发请求共享同一次刷新；每个用户创建一个 provider。如需自行缓存，可直接调用 `oauth.refresh(refreshToken)`。用户在 PicGo Cloud 撤销授权后，刷新会抛出 `kind: 'authentication'`、`code: 'invalid_grant'` 的 `PicGoCloudError`：请删除已存的 refresh token 并引导用户重新授权。浏览器应从你的后端获取短期 access token，而不是直接调用这些方法。
 ## 兑换会员（OAuth）
 
 ```ts
