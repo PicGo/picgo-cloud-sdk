@@ -1,17 +1,34 @@
 {
   "name": "@picgo/cloud-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0-beta.0",
   "description": "PicGo Cloud uploads and media management for modern browsers",
   "type": "module",
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/PicGo/picgo-cloud-sdk.git" },
-  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PicGo/picgo-cloud-sdk.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
   "sideEffects": false,
-  "files": ["dist", "README.md", "README_ZH.md", "CHANGELOG.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "README_ZH.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
     "dev": "pnpm build && node --env-file-if-exists=.env scripts/dev.mjs",
     "build": "rolldown -c && tsc -p tsconfig.build.json",
@@ -28,11 +45,17 @@
     "prepare": "husky"
   },
   "config": {
-    "commitizen": { "path": "./node_modules/cz-customizable" },
-    "cz-customizable": { "config": "./node_modules/@picgo/bump-version/.cz-config.cjs" }
+    "commitizen": {
+      "path": "./node_modules/cz-customizable"
+    },
+    "cz-customizable": {
+      "config": "./node_modules/@picgo/bump-version/.cz-config.cjs"
+    }
   },
   "commitlint": {
-    "extends": ["./node_modules/@picgo/bump-version/commitlint-picgo/index.cjs"]
+    "extends": [
+      "./node_modules/@picgo/bump-version/commitlint-picgo/index.cjs"
+    ]
   },
   "packageManager": "pnpm@11.7.0",
   "devDependencies": {
