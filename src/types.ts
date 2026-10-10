@@ -12,6 +12,46 @@ export interface RedeemResult {
   entitlementId: string
 }
 
+export interface UsageCounter {
+  used: number
+  limit: number
+  remaining: number
+}
+
+export interface StorageUsage {
+  /** Bytes. */
+  storage: UsageCounter
+  mediaCount: UsageCounter
+  upload: { maxFileBytes: number; allowedExtensions: string[] }
+}
+
+export type LifecyclePhase = 'active' | 'grace' | 'frozen' | 'pending_cleanup'
+
+export interface Entitlements {
+  plan: string
+  effectiveQuotaPlan: string
+  phase: LifecyclePhase
+  /** ISO timestamp, or null when the phase has no end. */
+  currentPhaseEndsAt: string | null
+  /** Informational; redeem() rechecks on the server. code is an API error code when not eligible. */
+  redemption: { eligible: boolean; code: string | null }
+}
+
+export interface UploadTaskQuery {
+  objectKey: string
+  /** Required for multipart uploads. */
+  uploadId?: string
+}
+
+export interface UploadTaskStatus {
+  objectKey: string
+  uploadId: string | null
+  kind: 'single' | 'multipart'
+  state: 'awaiting_object' | 'object_uploaded' | 'aborted'
+  sizeBytes: number | null
+  expiresAt: string
+}
+
 export interface WhoAmI {
   /** Available on current Workers; optional for compatibility with older deployments. */
   userId?: string

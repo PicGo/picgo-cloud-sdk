@@ -51,6 +51,15 @@ Requires an OAuth access token with `entitlements:redeem` and a Worker that supp
 
 Existing grants must obtain explicit consent for this new scope. Refreshing an old token does not add permissions. Active membership blocks redemption without consuming the voucher; a retry by the same user after successful redemption returns the original entitlement. API failures throw `PicGoCloudError` with `status` and `code` (for example `REDEMPTION_ACTIVE_MEMBERSHIP`, HTTP 409). The SDK does not automatically retry redemption. This method is new and is not included in the previously published `0.1.0` package.
 
+## Storage, membership and upload task status (OAuth)
+
+```ts
+const usage = await client.getStorageUsage()        // storage:usage:read
+const membership = await client.getEntitlements()   // entitlements:read
+const task = await client.getUploadStatus({ objectKey, uploadId }) // files:upload; uploadId only for multipart
+```
+
+`getStorageUsage()` returns used/limit/remaining for bytes and media count plus the upload size and extension limits. `getEntitlements()` returns the plan, lifecycle phase, phase end time and an informational `redemption.eligible` hint; `redeem()` still decides on the server. `getUploadStatus()` reports whether the object of an upload started by the same user and OAuth client has arrived (`awaiting_object`, `object_uploaded` or `aborted`). These methods are new and not included in `0.1.0`.
 ## Uploading files
 
 ```ts

@@ -51,6 +51,15 @@ const { entitlementId } = await client.redeem({ code: voucherCode })
 
 老授权需要用户明确同意新增权限，刷新旧 token 不会自动获得权限。有生效会员时拒绝兑换且不消耗兑换码；同一用户重试已成功的兑换返回原 entitlement。失败抛出带 `status`、`code` 的 `PicGoCloudError`，例如 HTTP 409 / `REDEMPTION_ACTIVE_MEMBERSHIP`。SDK 不自动重试兑换。此方法是新增功能，已发布的 `0.1.0` 包尚不包含它。
 
+## 容量、会员与上传任务状态（OAuth）
+
+```ts
+const usage = await client.getStorageUsage()        // storage:usage:read
+const membership = await client.getEntitlements()   // entitlements:read
+const task = await client.getUploadStatus({ objectKey, uploadId }) // files:upload；仅分片上传需要 uploadId
+```
+
+`getStorageUsage()` 返回容量字节数和文件数的已用/上限/剩余，以及单文件大小和扩展名限制。`getEntitlements()` 返回套餐、生命周期阶段、阶段结束时间，以及仅供参考的 `redemption.eligible`；能否兑换仍以 `redeem()` 的服务端结果为准。`getUploadStatus()` 报告同一用户、同一 OAuth 客户端发起的上传对象是否已到达（`awaiting_object`、`object_uploaded` 或 `aborted`）。这些方法是新增功能，`0.1.0` 尚不包含。
 ## 上传
 
 ```ts
