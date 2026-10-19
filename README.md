@@ -75,7 +75,7 @@ const { entitlementId } = await client.redeem({ code: voucherCode })
 
 Requires an OAuth access token with `entitlements:redeem` and a Worker that supports `POST /api/redeem`. Submission confirms redemption for the token's user, not the browser's logged-in account. No `userId` parameter is accepted. Keep client secrets and refresh tokens on the partner backend; the browser token provider should return only short-lived access tokens.
 
-Existing grants must obtain explicit consent for this new scope. Refreshing an old token does not add permissions. Active membership blocks redemption without consuming the voucher; a retry by the same user after successful redemption returns the original entitlement. API failures throw `PicGoCloudError` with `status` and `code` (for example `REDEMPTION_ACTIVE_MEMBERSHIP`, HTTP 409). The SDK does not automatically retry redemption. This method is new and is not included in the previously published `0.1.0` package.
+Existing grants must obtain explicit consent for this new scope. Refreshing an old token does not add permissions. Vouchers stack: remaining redemption time is consumed from the highest plan down, so a higher plan takes effect immediately and pauses lower ones, a lower plan is queued, and the same plan extends the time. An active subscription, admin grant or one-time purchase still blocks redemption (`REDEMPTION_ACTIVE_MEMBERSHIP`), and stacked time is capped at 3660 days (`REDEMPTION_STACK_LIMIT`); neither consumes the voucher. A retry by the same user after successful redemption returns the original entitlement. API failures throw `PicGoCloudError` with `status` and `code` (for example `REDEMPTION_ACTIVE_MEMBERSHIP`, HTTP 409). The SDK does not automatically retry redemption. This method is new and is not included in the previously published `0.1.0` package.
 
 ## Storage, membership and upload task status (OAuth)
 
@@ -85,7 +85,7 @@ const membership = await client.getEntitlements()   // entitlements:read
 const task = await client.getUploadStatus({ objectKey, uploadId }) // files:upload; uploadId only for multipart
 ```
 
-`getStorageUsage()` returns used/limit/remaining for bytes and media count plus the upload size and extension limits. `getEntitlements()` returns the plan, lifecycle phase, phase end time and an informational `redemption.eligible` hint; `redeem()` still decides on the server. `getUploadStatus()` reports whether the object of an upload started by the same user and OAuth client has arrived (`awaiting_object`, `object_uploaded` or `aborted`). These methods are new and not included in `0.1.0`.
+`getStorageUsage()` returns used/limit/remaining for bytes and media count plus the upload size and extension limits. `getEntitlements()` returns the plan, lifecycle phase, phase end time and an informational `redemption.eligible` hint. With stacked vouchers `currentPhaseEndsAt` is the end of the whole active period, and `plan` may change to a lower queued plan before then; `redeem()` still decides on the server. `getUploadStatus()` reports whether the object of an upload started by the same user and OAuth client has arrived (`awaiting_object`, `object_uploaded` or `aborted`). These methods are new and not included in `0.1.0`.
 ## Uploading files
 
 ```ts
